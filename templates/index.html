@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gembooth</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='theme.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet">
+    <script id="modes-data" type="application/json">{{ modes | tojson }}</script>
+</head>
+<body>
+    <main class="app">
+        <!-- Capture Screen -->
+        <div class="capture-screen" id="capture-screen">
+            <div class="preview-container">
+                <video id="video" class="preview-video" autoplay playsinline></video>
+                <img id="upload-preview" class="preview-image" alt="Preview" />
+                <canvas id="canvas" style="display:none;"></canvas>
+                <div class="preview-overlay"></div>
+            </div>
+            
+            <div class="capture-actions">
+                <button id="toggle-source" class="button button--icon" title="Switch source" aria-label="Switch source">
+                    <span class="icon">switch_camera</span>
+                </button>
+                <label class="button button--icon" for="file-input" id="upload-label" aria-label="Import photo" style="display:none;">
+                    <span class="icon">upload</span>
+                </label>
+                <input id="file-input" type="file" accept="image/*" style="display:none;" />
+            </div>
+            
+            <div class="capture-controls">
+                <button id="snap" class="shutter-button" aria-label="Take photo">
+                    <span class="icon">photo_camera</span>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Mode Selection -->
+        <div class="mode-selection">
+            <div class="mode-header">
+                <h2 class="mode-title">Styles</h2>
+                <button id="custom-toggle" class="mode-toggle">
+                    <span class="icon">edit</span>
+                    Custom
+                </button>
+            </div>
+            
+            <div class="mode-chips" id="mode-chips">
+                {% for key, value in modes.items() %}
+                    <div class="chip mode-chip" data-mode="{{ key }}">
+                        <span class="icon">{{ value.emoji }}</span>
+                        {{ value.name }}
+                    </div>
+                {% endfor %}
+                <div class="chip mode-chip" data-mode="custom">
+                    <span class="icon">edit</span>
+                    Custom
+                </div>
+            </div>
+            
+            <div class="custom-prompt-container" id="custom-prompt-container">
+                <textarea id="custom-prompt" class="custom-prompt-textarea" placeholder="Describe your style..." aria-label="Custom prompt"></textarea>
+            </div>
+        </div>
+        
+        <!-- Gallery Screen -->
+        <div class="gallery-screen" id="gallery-screen" style="display: none;">
+            <div class="gallery-header">
+                <h2 class="gallery-title">Gallery</h2>
+                <div class="gallery-actions">
+                    <button id="select-mode-btn" class="button button--icon" aria-label="Select photos">
+                        <span class="icon">select</span>
+                    </button>
+                    <button id="create-gif-btn" class="button button--primary" style="display: none;">
+                        <span class="icon">movie</span>
+                        Create GIF
+                    </button>
+                </div>
+            </div>
+            
+            <div class="gallery-content">
+                <ul id="photo-gallery" class="gallery-grid">
+                    <li class="gallery-empty" id="empty-state">
+                        <span class="icon">photo_library</span>
+                        <p class="gallery-empty-text">Let's make something. Take a photo or import one.</p>
+                        <button id="back-to-capture" class="button button--primary">Go to Camera</button>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- Export Screen -->
+        <div class="export-screen" id="export-screen" style="display: none;">
+            <div class="gallery-header">
+                <h2 class="gallery-title">Export</h2>
+            </div>
+            
+            <div class="export-content">
+                <div class="export-section">
+                    <h3 class="export-section-title">Size</h3>
+                    <div class="export-options">
+                        <div class="segmented-control size-segmented">
+                            <div class="segmented-control-item">
+                                <input type="radio" id="size-small" name="size" class="segmented-control-input" checked>
+                                <label for="size-small" class="segmented-control-label">Small</label>
+                            </div>
+                            <div class="segmented-control-item">
+                                <input type="radio" id="size-medium" name="size" class="segmented-control-input">
+                                <label for="size-medium" class="segmented-control-label">Medium</label>
+                            </div>
+                            <div class="segmented-control-item">
+                                <input type="radio" id="size-large" name="size" class="segmented-control-input">
+                                <label for="size-large" class="segmented-control-label">Large</label>
+                            </div>
+                            <div class="segmented-control-indicator"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="export-section">
+                    <h3 class="export-section-title">Metadata</h3>
+                    <div class="export-options">
+                        <div class="metadata-toggle">
+                            <span>Include location data</span>
+                            <div class="toggle">
+                                <input type="checkbox" id="include-location" class="toggle-input">
+                                <span class="toggle-slider"></span>
+                            </div>
+                        </div>
+                        <div class="metadata-toggle">
+                            <span>Include timestamp</span>
+                            <div class="toggle">
+                                <input type="checkbox" id="include-timestamp" class="toggle-input" checked>
+                                <span class="toggle-slider"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="export-actions">
+                <button id="export-button" class="button button--primary export-button">
+                    <span class="icon">download</span>
+                    Save to Photos
+                </button>
+            </div>
+        </div>
+        
+        <!-- Navigation -->
+        <nav class="navigation">
+            <div class="nav-item is-active" data-screen="capture">
+                <span class="icon nav-icon">photo_camera</span>
+                <span>Capture</span>
+            </div>
+            <div class="nav-item" data-screen="gallery">
+                <span class="icon nav-icon">photo_library</span>
+                <span>Gallery</span>
+            </div>
+            <div class="nav-item" data-screen="export">
+                <span class="icon nav-icon">save</span>
+                <span>Export</span>
+            </div>
+        </nav>
+    </main>
+    
+    <!-- Detail View -->
+    <div id="detail-view" class="detail-view">
+        <button id="detail-close" class="button button--icon detail-close-btn" aria-label="Close detail view">
+            <span class="icon">close</span>
+        </button>
+        <div class="detail-content">
+            <img id="detail-image" class="detail-image" alt="Detail view" />
+        </div>
+        <div class="detail-actions">
+            <button class="button detail-toggle" id="toggle-original">
+                <span class="icon">photo</span>
+                Original
+            </button>
+            <button class="button detail-toggle" id="toggle-edited">
+                <span class="icon">auto_awesome</span>
+                Edited
+            </button>
+            <button id="detail-download" class="button button--icon">
+                <span class="icon">download</span>
+            </button>
+        </div>
+    </div>
+    
+    <!-- Toast -->
+    <div id="toast" class="toast">
+        <span id="toast-icon" class="toast-icon"></span>
+        <div id="toast-content" class="toast-content"></div>
+        <button id="toast-close" class="toast-close" aria-label="Close toast"><span class="icon">close</span></button>
+    </div>
+    
+    <!-- Progress HUD -->
+    <div id="progress-hud" class="progress-hud">
+        <div class="progress-content">
+            <div class="progress-spinner"></div>
+            <div id="progress-text" class="progress-text">Applying edit...</div>
+            <div id="progress-percentage" class="progress-subtext">0%</div>
+            <div id="progress-subtext" class="progress-subtext"></div>
+            <button id="progress-cancel" class="progress-cancel">Cancel</button>
+        </div>
+    </div>
+    
+    <script>
+        // App state
+        const state = {
+            currentScreen: 'capture',
+            captureSource: 'camera',
+            selectedMode: 'renaissance',
+            customPrompt: '',
+            photos: [],
+            stream: null,
+            selectedPhotos: [],
+            currentDetailPhoto: null,
+            isDetailOriginal: true,
+            isSelectMode: false,
+        };
+        
+        // DOM Elements
+        const elements = {
+            // Screens
+            captureScreen: document.getElementById('capture-screen'),
+            galleryScreen: document.getElementById('gallery-screen'),
+            exportScreen: document.getElementById('export-screen'),
+            
+            // Video/Preview
+            video: document.getElementById('video'),
+            uploadPreview: document.getElementById('upload-preview'),
+            canvas: document.getElementById('canvas'),
+            
+            // Buttons
+            toggleSourceBtn: document.getElementById('toggle-source'),
+            snapBtn: document.getElementById('snap'),
+            fileInput: document.getElementById('file-input'),
+            uploadLabel: document.getElementById('upload-label'),
+            customToggle: document.getElementById('custom-toggle'),
+            backToCapture: document.getElementById('back-to-capture'),
+            exportButton: document.getElementById('export-button'),
+            selectModeBtn: document.getElementById('select-mode-btn'),
+            createGifBtn: document.getElementById('create-gif-btn'),
+            
+            // Mode Selection
+            modeChips: document.getElementById('mode-chips'),
+            customPromptContainer: document.getElementById('custom-prompt-container'),
+            customPrompt: document.getElementById('custom-prompt'),
+            
+            // Gallery
+            photoGallery: document.getElementById('photo-gallery'),
+            emptyState: document.getElementById('empty-state'),
+            
+            // Detail View
+            detailView: document.getElementById('detail-view'),
+            detailImage: document.getElementById('detail-image'),
+            detailClose: document.getElementById('detail-close'),
+            toggleOriginal: document.getElementById('toggle-original'),
+            toggleEdited: document.getElementById('toggle-edited'),
+            detailDownload: document.getElementById('detail-download'),
+            
+            // Navigation
+            navItems: document.querySelectorAll('.nav-item'),
+            
+            // Toast
+            toast: document.getElementById('toast'),
+            toastIcon: document.getElementById('toast-icon'),
+            toastContent: document.getElementById('toast-content'),
+            
+            // Progress HUD
+            progressHud: document.getElementById('progress-hud'),
+            progressText: document.getElementById('progress-text'),
+            progressSubtext: document.getElementById('progress-subtext'),
+            progressCancel: document.getElementById('progress-cancel')
+        };
+        
+        // Toast timer handle
+        let toastTimer = null;
+        let percentageCounterInterval = null;
+
+        // Initialize the app
+        function init() {
+            updateModeSelection();
+            startCamera();
+            bindEvents();
+            switchScreen('capture');
+        }
+        
+        // Bind event listeners
+        function bindEvents() {
+            elements.navItems.forEach(item => {
+                item.addEventListener('click', () => switchScreen(item.dataset.screen));
+            });
+            
+            elements.toggleSourceBtn.addEventListener('click', toggleSource);
+            elements.snapBtn.addEventListener('click', capturePhoto);
+            elements.fileInput.addEventListener('change', handleFileSelect);
+            
+            elements.modeChips.addEventListener('click', (e) => {
+                const chip = e.target.closest('.mode-chip');
+                if (chip) selectMode(chip.dataset.mode);
+            });
+            
+            elements.customToggle.addEventListener('click', () => selectMode('custom'));
+            elements.customPrompt.addEventListener('input', () => {
+                state.customPrompt = elements.customPrompt.value;
+            });
+            
+            elements.backToCapture.addEventListener('click', () => switchScreen('capture'));
+            elements.selectModeBtn.addEventListener('click', toggleSelectMode);
+            elements.createGifBtn.addEventListener('click', createGif);
+            
+            elements.detailView.addEventListener('click', (e) => {
+                if (e.target === elements.detailView) closeDetailView();
+            });
+            elements.detailClose.addEventListener('click', closeDetailView);
+            
+            elements.toggleOriginal.addEventListener('click', () => {
+                state.isDetailOriginal = true;
+                updateDetailView();
+            });
+            
+            elements.toggleEdited.addEventListener('click', () => {
+                state.isDetailOriginal = false;
+                updateDetailView();
+            });
+            
+            elements.detailDownload.addEventListener('click', downloadDetailImage);
+            
+            elements.toast.addEventListener('click', hideToast);
+            elements.progressCancel.addEventListener('click', hideProgressHud);
+
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    if (elements.detailView.classList.contains('is-open')) closeDetailView();
+                    if (elements.toast.classList.contains('is-visible')) hideToast();
+                }
+            });
+        }
+        
+        async function startCamera() {
+            if (!navigator.mediaDevices?.getUserMedia) return;
+            try {
+                state.stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                elements.video.srcObject = state.stream;
+                await elements.video.play();
+            } catch (e) {
+                state.captureSource = 'upload';
+                updateSourceUI();
+            }
+        }
+        
+        function stopCamera() {
+            if (state.stream) {
+                state.stream.getTracks().forEach(track => track.stop());
+                state.stream = null;
+            }
+            elements.video.srcObject = null;
+        }
+        
+        function toggleSource() {
+            state.captureSource = state.captureSource === 'camera' ? 'upload' : 'camera';
+            updateSourceUI();
+        }
+        
+        function updateSourceUI() {
+            const isCamera = state.captureSource === 'camera';
+            elements.video.style.display = isCamera ? '' : 'none';
+            elements.uploadPreview.style.display = isCamera ? 'none' : '';
+            elements.uploadLabel.style.display = isCamera ? 'none' : '';
+            if (isCamera && !state.stream) startCamera();
+            else if (!isCamera) stopCamera();
+        }
+        
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => elements.uploadPreview.src = ev.target.result;
+            reader.readAsDataURL(file);
+        }
+        
+        function capturePhoto() {
+            let dataURL;
+            const isCamera = state.captureSource === 'camera';
+            
+            if (isCamera) {
+                if (!elements.video.videoWidth) return;
+                elements.canvas.width = elements.video.videoWidth;
+                elements.canvas.height = elements.video.videoHeight;
+                elements.canvas.getContext('2d').drawImage(elements.video, 0, 0);
+                dataURL = elements.canvas.toDataURL('image/jpeg');
+            } else {
+                if (!elements.uploadPreview.src) {
+                    showToast('Please choose an image to upload', 'error');
+                    return;
+                }
+                const img = elements.uploadPreview;
+                elements.canvas.width = img.naturalWidth || 512;
+                elements.canvas.height = img.naturalHeight || 512;
+                elements.canvas.getContext('2d').drawImage(img, 0, 0);
+                dataURL = elements.canvas.toDataURL('image/jpeg');
+            }
+            
+            showProgressHud('Applying edit...');
+            
+            const modesData = JSON.parse(document.getElementById('modes-data').textContent);
+            const promptText = state.selectedMode === 'custom' ? state.customPrompt : modesData[state.selectedMode].prompt;
+            
+            const generationPromise = fetch('/generate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: dataURL, prompt: promptText, mode: state.selectedMode })
+            })
+            .then(res => res.ok ? res.json() : res.json().then(err => Promise.reject(new Error(err.error))));
+
+            const timerPromise = new Promise(resolve => setTimeout(resolve, 10000));
+
+            Promise.all([generationPromise, timerPromise])
+            .then(([data, _]) => {
+                hideProgressHud();
+                addToGallery(data);
+                showToast('Image generated successfully!', 'success');
+                switchScreen('gallery');
+            })
+            .catch(err => {
+                hideProgressHud();
+                showToast(err.message || 'Image generation failed', 'error');
+            });
+        }
+        
+        function addToGallery(photoData) {
+            if (elements.emptyState) elements.emptyState.remove();
+            
+            const li = document.createElement('li');
+            li.className = 'gallery-item';
+            li.dataset.id = photoData.id;
+            
+            const img = document.createElement('img');
+            img.className = 'gallery-item-image';
+            img.src = photoData.output_url;
+            img.alt = 'Generated photo';
+            
+            const badge = document.createElement('div');
+            badge.className = 'gallery-item-badge';
+            badge.textContent = photoData.emoji;
+            
+            li.append(img, badge);
+            li.addEventListener('click', () => handleGalleryItemClick(photoData, li));
+            elements.photoGallery.appendChild(li);
+            state.photos.push(photoData);
+        }
+
+        function handleGalleryItemClick(photoData, itemElement) {
+            if (state.isSelectMode) {
+                const photoId = photoData.id;
+                const index = state.selectedPhotos.indexOf(photoId);
+
+                if (index > -1) {
+                    state.selectedPhotos.splice(index, 1);
+                    itemElement.classList.remove('gallery-item-selected');
+                } else {
+                    state.selectedPhotos.push(photoId);
+                    itemElement.classList.add('gallery-item-selected');
+                }
+                elements.createGifBtn.style.display = state.selectedPhotos.length > 1 ? 'flex' : 'none';
+            } else {
+                openDetailView(photoData);
+            }
+        }
+
+        function toggleSelectMode() {
+            state.isSelectMode = !state.isSelectMode;
+            elements.galleryScreen.classList.toggle('is-select-mode', state.isSelectMode);
+            elements.createGifBtn.style.display = 'none';
+
+            if (!state.isSelectMode) {
+                state.selectedPhotos = [];
+                document.querySelectorAll('.gallery-item-selected').forEach(el => el.classList.remove('gallery-item-selected'));
+            }
+        }
+
+        function createGif() {
+            if (state.selectedPhotos.length < 2) {
+                showToast('Select at least 2 photos to create a GIF.', 'error');
+                return;
+            }
+            showProgressHud('Creating GIF...');
+            fetch('/make_gif', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ photo_ids: state.selectedPhotos })
+            })
+            .then(res => res.ok ? res.json() : Promise.reject('Failed to create GIF'))
+            .then(data => {
+                hideProgressHud();
+                const newPhotoData = {
+                    id: `gif-${Date.now()}`,
+                    output_url: data.gif_url,
+                    input_url: data.gif_url,
+                    emoji: '🎬',
+                    isGif: true
+                };
+                addToGallery(newPhotoData);
+                toggleSelectMode();
+                showToast('GIF created successfully!', 'success');
+            })
+            .catch(err => {
+                hideProgressHud();
+                showToast(err, 'error');
+            });
+        }
+        
+        function selectMode(mode) {
+            state.selectedMode = mode;
+            updateModeSelection();
+            elements.customPromptContainer.style.display = mode === 'custom' ? 'block' : 'none';
+            if (mode === 'custom') elements.customPrompt.focus();
+        }
+        
+        function updateModeSelection() {
+            document.querySelectorAll('.mode-chip').forEach(chip => {
+                chip.classList.toggle('chip--selected', chip.dataset.mode === state.selectedMode);
+            });
+        }
+        
+        function switchScreen(screen) {
+            state.currentScreen = screen;
+            const screens = [elements.captureScreen, elements.galleryScreen, elements.exportScreen];
+            const target = document.getElementById(`${screen}-screen`);
+            
+            screens.forEach(s => {
+                if (s !== target && s.style.display !== 'none') {
+                    s.classList.remove('is-active');
+                    s.addEventListener('transitionend', () => s.style.display = 'none', { once: true });
+                }
+            });
+
+            target.style.display = 'flex';
+            requestAnimationFrame(() => target.classList.add('is-active'));
+
+            elements.navItems.forEach(item => {
+                item.classList.toggle('is-active', item.dataset.screen === screen);
+            });
+
+            if (elements.detailView.classList.contains('is-open')) closeDetailView();
+        }
+        
+        function openDetailView(photoData) {
+            if (photoData.isGif) {
+                state.currentDetailPhoto = photoData;
+                elements.detailImage.src = photoData.output_url;
+                elements.toggleOriginal.style.display = 'none';
+                elements.toggleEdited.style.display = 'none';
+                elements.detailView.classList.add('is-open');
+            } else {
+                state.currentDetailPhoto = photoData;
+                state.isDetailOriginal = false;
+                updateDetailView();
+                elements.toggleOriginal.style.display = '';
+                elements.toggleEdited.style.display = '';
+                elements.detailView.classList.add('is-open');
+            }
+        }
+        
+        function updateDetailView() {
+            if (!state.currentDetailPhoto) return;
+            const isOriginal = state.isDetailOriginal;
+            elements.detailImage.src = isOriginal ? state.currentDetailPhoto.input_url : state.currentDetailPhoto.output_url;
+            elements.toggleOriginal.classList.toggle('is-active', isOriginal);
+            elements.toggleEdited.classList.toggle('is-active', !isOriginal);
+        }
+        
+        function closeDetailView() {
+            elements.detailView.classList.remove('is-open');
+            state.currentDetailPhoto = null;
+        }
+        
+        function downloadDetailImage() {
+            if (!state.currentDetailPhoto) return;
+            const url = state.isDetailOriginal ? state.currentDetailPhoto.input_url : state.currentDetailPhoto.output_url;
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `gembooth-${state.currentDetailPhoto.id}.png`;
+            link.click();
+            showToast('Image downloaded!', 'success');
+        }
+        
+        function showToast(message, type = 'info') {
+            if (toastTimer) clearTimeout(toastTimer);
+            
+            elements.toastContent.textContent = message;
+            elements.toast.className = 'toast'; // Reset classes
+            elements.toast.classList.add(`toast--${type}`);
+
+            if (type === 'success') {
+                elements.toastIcon.textContent = 'check_circle';
+            } else if (type === 'error') {
+                elements.toastIcon.textContent = 'error';
+            } else {
+                elements.toastIcon.textContent = 'info';
+            }
+            
+            elements.toast.classList.add('is-visible');
+
+            toastTimer = setTimeout(hideToast, 4000);
+        }
+        
+        function hideToast() {
+            elements.toast.classList.remove('is-visible');
+            if (toastTimer) {
+                clearTimeout(toastTimer);
+                toastTimer = null;
+            }
+        }
+        
+        function showProgressHud(text, subtext = '') {
+            elements.progressText.textContent = text;
+            elements.progressSubtext.textContent = subtext;
+            elements.progressHud.classList.add('is-visible');
+
+            let percentage = 0;
+            const percentageElement = document.getElementById('progress-percentage');
+            percentageElement.textContent = '0%';
+
+            if (percentageCounterInterval) clearInterval(percentageCounterInterval);
+
+            percentageCounterInterval = setInterval(() => {
+                percentage++;
+                if (percentage <= 100) {
+                    percentageElement.textContent = `${percentage}%`;
+                } else {
+                    clearInterval(percentageCounterInterval);
+                }
+            }, 100);
+        }
+        
+        function hideProgressHud() {
+            elements.progressHud.classList.remove('is-visible');
+            if (percentageCounterInterval) {
+                clearInterval(percentageCounterInterval);
+                percentageCounterInterval = null;
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

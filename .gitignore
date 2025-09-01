@@ -1,0 +1,57 @@
+# Python bytecode and build artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+venv/
+.venv/
+ENV/
+env/
+
+# Flask/instance data, databases, and logs
+instance/
+*.db
+*.sqlite
+*.sqlite3
+logs/
+*.log
+
+# Secrets and environment files
+.env
+.env.*
+!.env.example
+.envrc
+*.pem
+*.key
+*.crt
+
+# Generated user images and uploads (personal data)
+static/generated_images/
+uploads/
+data/
+tmp/
+
+# Design mockups (binary assets not tracked)
+mockups/
+
+# OS/Editor junk
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.code-workspace
+
+# Node/Frontend (if added later)
+node_modules/
+.parcel-cache/
+.turbo/
+.next/
+out/
+
