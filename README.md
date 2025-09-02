@@ -1,6 +1,6 @@
 # GemBooth
 
-GemBooth is a small Flask web application that acts like an AI photobooth.  It lets you capture a picture from your webcam or upload an existing image and then applies fun image transformations by talking to the [OpenRouter](https://openrouter.ai) API.
+GemBooth is a small Flask web application that acts like an AI photobooth.  It lets you capture a picture from your webcam or upload an existing image and then applies fun image transformations by talking to the [OpenRouter](https://openrouter.ai) API.  Each transformation now includes a surprise "photobomber" character that is merged into the final image.
 
 ## Features
 
@@ -8,6 +8,7 @@ GemBooth is a small Flask web application that acts like an AI photobooth.  It l
 - Choose from a number of preset styles (Renaissance, Cartoon, Anime, etc.) or supply a custom prompt for the model.
 - Generated images are saved alongside the original and displayed in the gallery.
 - Combine original/generated pairs into an animated GIF.
+- Every request adds a randomly selected photobomber into the scene.
 
 ## Requirements
 
@@ -48,6 +49,17 @@ The app expects a few environment variables.  They can be placed in a `.env` fil
 4. Pick a style or enter a custom prompt and take/upload a picture.  The generated image will appear in the gallery.  Select multiple results and click **Make GIF** to produce a simple animation.
 
 Generated and source images are stored under `static/generated_images/` while the server is running.
+
+## Photobombers
+
+To make things more fun, each generation includes an extra "photobomber" image.  When a photo is submitted the server:
+
+1. Randomly chooses an image from `static/photobomber/`.
+2. Builds a prompt by taking the selected style prompt (or your custom text) and appending instructions to insert the photobomber.  The request sent to OpenRouter includes both the original photo and the photobomber image so the model can blend them together.
+
+### Adding Your Own Photobombers
+
+Place PNG or JPEG files in `static/photobomber/`.  The filename (without extension) is used to describe the character.  Optionally add a `.txt` file with the same name to supply a more detailed description that will be appended to the prompt.  Restart the server and the new photobomber will be picked at random for future requests.
 
 ## Testing
 
