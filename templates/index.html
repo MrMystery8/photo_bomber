@@ -12,6 +12,14 @@
 </head>
 <body>
     <main class="app">
+        <header class="app-header">
+            <h1 class="app-title">Gembooth</h1>
+            <div class="header-actions">
+                <button id="theme-toggle" class="button button--icon" aria-label="Toggle theme">
+                    <span class="icon" id="theme-toggle-icon">light_mode</span>
+                </button>
+            </div>
+        </header>
         <!-- Capture Screen -->
         <div class="capture-screen" id="capture-screen">
             <div class="preview-container">
@@ -244,6 +252,8 @@
             exportButton: document.getElementById('export-button'),
             selectModeBtn: document.getElementById('select-mode-btn'),
             createGifBtn: document.getElementById('create-gif-btn'),
+            themeToggle: document.getElementById('theme-toggle'),
+            themeToggleIcon: document.getElementById('theme-toggle-icon'),
             
             // Mode Selection
             modeChips: document.getElementById('mode-chips'),
@@ -283,6 +293,7 @@
 
         // Initialize the app
         function init() {
+            initTheme();
             updateModeSelection();
             startCamera();
             bindEvents();
@@ -312,6 +323,7 @@
             elements.backToCapture.addEventListener('click', () => switchScreen('capture'));
             elements.selectModeBtn.addEventListener('click', toggleSelectMode);
             elements.createGifBtn.addEventListener('click', createGif);
+            elements.themeToggle.addEventListener('click', toggleTheme);
             
             elements.detailView.addEventListener('click', (e) => {
                 if (e.target === elements.detailView) closeDetailView();
@@ -340,7 +352,21 @@
                 }
             });
         }
-        
+
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            elements.themeToggleIcon.textContent = savedTheme === 'dark' ? 'light_mode' : 'dark_mode';
+        }
+
+        function toggleTheme() {
+            const current = document.documentElement.getAttribute('data-theme');
+            const next = current === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+            elements.themeToggleIcon.textContent = next === 'dark' ? 'light_mode' : 'dark_mode';
+        }
+
         async function startCamera() {
             if (!navigator.mediaDevices?.getUserMedia) return;
             try {
