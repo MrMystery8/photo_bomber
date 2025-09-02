@@ -25,6 +25,11 @@ client = OpenAI(
 # In-memory store for images
 image_store = {}
 
+# Feature flags / config
+PHOTOBOMBER_ENABLED = (
+    os.environ.get('PHOTOBOMBER_ENABLED', 'true').strip().lower() in ('1', 'true', 'yes', 'on')
+)
+
 
 def get_random_photobomber_b64(output_mime: str = 'image/jpeg'):
     """Return base64-encoded data of a random photobomber image, encoded
@@ -62,57 +67,57 @@ modes = {
   "renaissance": {
     "name": "Renaissance",
     "emoji": "🎨",
-    "prompt": "Renaissance oil painting on canvas with sfumato and chiaroscuro; muted earth tones (umber, ochre, sienna); soft edges with subtle brush texture; warm varnish color grade; gentle filmic contrast and 50mm perspective. Apply this style uniformly to the entire image and any inserted subject."
+    "prompt": "STRICT Renaissance oil painting on canvas: strong chiaroscuro + sfumato, muted umber/ochre/sienna palette, visible brushwork, warm varnish grade; apply uniformly to the entire image."
   },
   "cartoon": {
     "name": "Cartoon",
     "emoji": "😃",
-    "prompt": "Flat-color cartoon style: minimal lines, thick clean outlines (single weight), 2–3 tones per region, saturated playful palette, no gradients or textures, simple cel shading. Apply this style uniformly to the entire image and any inserted subject."
+    "prompt": "HARD cartoon conversion: thick uniform black outlines, 2–3 flat tones per region, saturated playful palette, no gradients or textures; apply to the whole image."
   },
   "statue": {
     "name": "Statue",
     "emoji": "🏛️",
-    "prompt": "Classical marble statue look: convert subjects, clothing, and surfaces into carved marble; grayscale stone palette; subtle chisel marks; soft subsurface scattering hints; studio-like top-light; no pigment color. Apply this style uniformly to the entire image and any inserted subject."
+    "prompt": "FULL marble conversion: turn all subjects and surfaces into carved white marble; grayscale stone with subtle chisel marks, soft studio top‑light; zero pigment color across the image."
   },
   "80s": {
     "name": "80s",
     "emoji": "✨",
-    "prompt": "1980s yearbook photo: studio flash with soft fill, pastel gradient backdrop, gentle vignette, mild film grain, period-accurate color grade, hair and clothing may be updated to match the era. Apply this style uniformly to the entire image and any inserted subject."
+    "prompt": "AUTHENTIC 1980s studio portrait: pastel airbrushed backdrop, direct flash with soft fill, mild film grain, gentle vignette, era‑correct color grade applied globally."
   },
   "19century": {
     "name": "19th Cent.",
     "emoji": "🎩",
-    "prompt": "Daguerreotype: monochrome silver tone, shallow dynamic range, halation glow, period lens falloff and vignetting, plate artifacts and slight motion blur; period-appropriate background and attire allowed. Apply this style uniformly to the entire image and any inserted subject."
+    "prompt": "TRUE daguerreotype plate: monochrome silver tone, low dynamic range, halation glow, lens falloff + vignette, plate streaks/blemishes; accept slight motion blur; apply to all content."
   },
   "anime": {
     "name": "Anime",
     "emoji": "🍣",
-    "prompt": "Photorealistic anime: crisp line art, controlled cel shading, soft skin gradients, stylized speculars, clean backgrounds, saturated yet balanced palette, minimal grain. Apply this style uniformly to the entire image and any inserted subject."
+    "prompt": "FORCE photorealistic‑anime look: crisp line art, controlled cel shading, soft skin gradients, clean backgrounds, saturated yet balanced palette, no photographic texture or grain; apply uniformly."
   },
   "psychedelic": {
     "name": "Psychedelic",
     "emoji": "🌈",
-    "prompt": "1960s psychedelic poster: hand-drawn look with bold flat colors and swirling organic shapes, high-contrast complementary palette, screenprint texture, no text. Apply this style uniformly to the entire image and any inserted subject."
+    "prompt": "BOLD 1960s psychedelic poster: flat high‑contrast complementary colors, swirling organic shapes, screenprint texture/misregistration; apply across the whole image."
   },
   "8bit": {
     "name": "8-bit",
     "emoji": "🎮",
-    "prompt": "8-bit pixel art: render on an ~80×80 pixel grid, bright NES-like palette, hard edges, no anti-aliasing, 1–2 px outlines, simple dithering for gradients, minimal shading. Apply this style uniformly to the entire image and any inserted subject."
+    "prompt": "STRICT 8‑bit pixel art: ~80×80 grid, limited bright NES palette, hard 1–2 px outlines, no anti‑aliasing; use coarse dithering for gradients; convert the full image."
   },
   "beard": {
     "name": "Big Beard",
     "emoji": "🧔🏻",
-    "prompt": "Add an oversized, realistic beard to the main subject while preserving the original photographic style (color grade, lighting, noise, sharpness). Ensure any inserted subject matches the same look. Avoid altering the scene beyond the beard addition."
+    "prompt": "Add an oversized realistic beard ONLY; preserve original photographic lighting/grade/grain/sharpness elsewhere; do not alter other scene elements."
   },
   "comic": {
     "name": "Comic Book",
     "emoji": "💥",
-    "prompt": "Vintage comic panel: bold black inks, halftone dots at 45°, limited CMYK palette, slight off-register charm, paper texture; speech bubbles allowed. Apply this style uniformly to the entire image and any inserted subject."
+    "prompt": "VINTAGE comic halftone: heavy black inks, 45° CMYK dots, limited colors, slight off‑register charm, paper texture; apply globally."
   },
   "old": {
     "name": "Old",
     "emoji": "👵🏻",
-    "prompt": "Dramatically age the primary person: realistic wrinkles, skin sag, hair graying/thinning, age spots, posture changes; maintain the original photographic style (lighting, grade, grain, sharpness). Ensure any inserted subject matches the same style."
+    "prompt": "HARD age‑up: convincing wrinkles, skin sag, age spots, gray/thin hair and posture changes; retain the original photo grade/lighting; avoid other scene edits."
   }
 }
 
@@ -165,66 +170,44 @@ def generate():
         title = os.environ.get('SITE_TITLE') or 'Gembooth'
         api_model = os.environ.get('IMAGE_MODEL', 'google/gemini-2.5-flash-image-preview:free')
 
-        b64_random, photobomber_path = get_random_photobomber_b64(input_mime)
+        b64_random = None
+        if PHOTOBOMBER_ENABLED:
+            b64_random, photobomber_path = get_random_photobomber_b64(input_mime)
+        else:
+            photobomber_message = 'Photobomber disabled by PHOTOBOMBER_ENABLED=false'
 
         # Build prompt, auto-instructing the model to perform a photobomb when present
         base_prompt = prompt or modes.get(mode, {}).get('prompt', '')
         if b64_random:
             auto_instr = (
-                '''You are an image editor and compositor.
+                """
+You are an image editor. Use Image A as the base and insert the subject from Image B as a subtle photobomb. Adopt the selected mode’s art style as the single source of truth and apply it uniformly to the entire result and to the inserted subject.
 
-INPUTS
-- Image A: the user’s original scene to edit.
-- Image B: a photobomber subject to extract and insert into Image A.
+Style lock (must match exactly):
+- Rendering medium/technique (oil paint, cel‑shaded anime, halftone, marble, pixel grid)
+- Line/edge handling and outline weight
+- Palette and tonal range (hues, saturation, contrast)
+- Texture/noise model (brush texture, paper grain, halftone dots, pixelation)
+- Global grade/LUT, lens characteristics (FOV/distortion), and resolution/sharpness
 
-OBJECTIVE
-Insert the subject from Image B into Image A as a subtle, sneaky photobomb that is fully consistent with the overall visual style of the final image.
+Blend the insert naturally:
+- Match perspective and camera height/horizon; scale/pose to local context
+- Match lighting direction/intensity/color temperature; add contact shadows and soft AO
+- Match depth of field and any motion blur; match grain/sharpening/compression
+- Use plausible occlusion from Image A (doorframe, shoulder, plant, railing)
+- Placement: prefer edge/background or reflections; avoid center and blocking important faces; avoid direct eye contact
 
-GLOBAL STYLE UNIFICATION
-- Treat the user/mode prompt text as the authoritative style specification for the whole output.
-- If Image A already exhibits a stylization (e.g., anime/cartoon/renaissance/comic/8-bit), analyze and adopt that exact style.
-- Apply the same style pipeline to the inserted subject: medium/material (oil paint, pencil, halftone, marble, pixel grid), line weight/edge handling, palette and tonal range, texture/noise pattern, shading model, and global color grade/LUT.
-- Ensure the photobomber never reads as a separate layer: identical rendering technique, resolution/sharpness, and post-processing as Image A.
+Generative adjustment (preserve identity):
+- You may re‑pose, scale, rotate, and reposition the photobomber; inpaint/outpaint missing or occluded regions; adjust clothing folds, hands/limbs, and minor accessories; nudge colors and shading; and locally relight to match the scene—so long as the person’s identity remains intact.
+- Preserve recognizable identity cues: facial structure/proportions, eyes/nose/mouth spacing, hairstyle silhouette, and primary clothing pattern/colors. If a choice risks identity loss, choose the smallest edit that still blends perfectly.
 
-SNEAKY PHOTOBOMBING
-- Placement mode: [edge-of-frame | mid-background crowd | behind foreground object | reflection in glass/mirror].
-- Sneakiness level: high → subject is off-center, partially occluded, and not drawing immediate focus; avoid direct eye contact with the camera.
-- Keep outside the 3x3 grid center; prefer edges, background lanes, or reflective surfaces.
-- Scale and pose to match local context (heights, seating/standing level, furniture scale).
+Edge/matte quality:
+- Hair‑aware matting; remove halos/fringing; feather to local frequency; no cutout look
 
-COMPOSITION & OCCLUSION
-- Do not cover important faces or primary subjects in Image A (use a saliency/face-protection pass).
-- Use plausible occluders from Image A (doorframe, shoulder, plant, railing) to sell depth and integration.
-
-PERSPECTIVE & GEOMETRY
-- Match camera height, horizon line, vanishing directions, and lens characteristics (distortion/FOV) from Image A.
-
-LIGHTING & COLOR
-- Match light direction, intensity, and color temperature.
-- Add physically plausible contact shadows and soft ambient occlusion at contact points.
-- Reproduce specular highlights/roughness consistent with surrounding materials.
-- Conform to Image A’s global grade: white balance, contrast, saturation, and any LUT-like look.
-
-FOCUS, MOTION & NOISE
-- Match depth of field: blur the subject appropriately if its plane is out of focus.
-- Add motion blur when consistent with local motion in Image A.
-- Match sensor noise/grain, sharpening, compression artifacts, and any halftone/pixel structure for the chosen style.
-
-EDGE TREATMENT & MATTE
-- Perform hair-aware matting; remove halos and fringing.
-- Feather edges and frequency-match to avoid a cutout look.
-
-REFLECTIONS & INTERACTIONS (if applicable)
-- If near reflective/glossy surfaces, add a correctly blurred/dimmed reflection with accurate perspective.
-- Ensure correct shadow length and softness based on Image A’s key/fill lighting.
-
-PROTECTIONS & AVOID
-- Do not resize or crop Image A; preserve all original people and background.
-- Avoid center placement and overlapping primary faces.
-- Avoid mismatched sharpness, color cast, HDR pop, or inconsistent line/texture that breaks style cohesion.
-
-OUTPUT
-Return only the edited version of Image A at its original resolution. No captions, borders, or extra canvas.'''
+Protections:
+- Do not crop or resize Image A; preserve all original people and background
+- Output only the edited Image A at its original resolution (no borders or captions)
+"""
             )
             full_prompt = (base_prompt + "\n\n" + auto_instr).strip()
         else:
@@ -332,6 +315,8 @@ Return only the edited version of Image A at its original resolution. No caption
         'emoji': modes.get(mode, {}).get('emoji', '✨'),
         'api_error': api_error,
         'photobomber_message': photobomber_message,
+        'used_prompt': full_prompt,
+        'model': api_model,
     })
 
 @app.route('/make_gif', methods=['POST'])
