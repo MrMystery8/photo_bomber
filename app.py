@@ -62,57 +62,57 @@ modes = {
   "renaissance": {
     "name": "Renaissance",
     "emoji": "🎨",
-    "prompt": "Make the person in the photo look like a Renaissance painting."
+    "prompt": "Renaissance oil painting on canvas with sfumato and chiaroscuro; muted earth tones (umber, ochre, sienna); soft edges with subtle brush texture; warm varnish color grade; gentle filmic contrast and 50mm perspective. Apply this style uniformly to the entire image and any inserted subject."
   },
   "cartoon": {
     "name": "Cartoon",
     "emoji": "😃",
-    "prompt": "Transform this image into a cute simple cartoon. Use minimal lines and solid colors."
+    "prompt": "Flat-color cartoon style: minimal lines, thick clean outlines (single weight), 2–3 tones per region, saturated playful palette, no gradients or textures, simple cel shading. Apply this style uniformly to the entire image and any inserted subject."
   },
   "statue": {
     "name": "Statue",
     "emoji": "🏛️",
-    "prompt": "Make the person look like a classical marble statue, including the clothes and eyes."
+    "prompt": "Classical marble statue look: convert subjects, clothing, and surfaces into carved marble; grayscale stone palette; subtle chisel marks; soft subsurface scattering hints; studio-like top-light; no pigment color. Apply this style uniformly to the entire image and any inserted subject."
   },
   "80s": {
     "name": "80s",
     "emoji": "✨",
-    "prompt": "Make the person in the photo look like a 1980s yearbook photo. Feel free to change the hairstyle and clothing."
+    "prompt": "1980s yearbook photo: studio flash with soft fill, pastel gradient backdrop, gentle vignette, mild film grain, period-accurate color grade, hair and clothing may be updated to match the era. Apply this style uniformly to the entire image and any inserted subject."
   },
   "19century": {
     "name": "19th Cent.",
     "emoji": "🎩",
-    "prompt": "Make the photo look like a 19th century daguerreotype. Feel free to change the background to make it period appropriate and add props like Victorian clothing. Try to keep the perspective the same."
+    "prompt": "Daguerreotype: monochrome silver tone, shallow dynamic range, halation glow, period lens falloff and vignetting, plate artifacts and slight motion blur; period-appropriate background and attire allowed. Apply this style uniformly to the entire image and any inserted subject."
   },
   "anime": {
     "name": "Anime",
     "emoji": "🍣",
-    "prompt": "Make the person in the photo look like a photorealistic anime character with exaggerated features."
+    "prompt": "Photorealistic anime: crisp line art, controlled cel shading, soft skin gradients, stylized speculars, clean backgrounds, saturated yet balanced palette, minimal grain. Apply this style uniformly to the entire image and any inserted subject."
   },
   "psychedelic": {
     "name": "Psychedelic",
     "emoji": "🌈",
-    "prompt": "Create a 1960s psychedelic hand-drawn poster-style illustration based on this image with bright bold solid colors and swirling shapes. Don't add any text."
+    "prompt": "1960s psychedelic poster: hand-drawn look with bold flat colors and swirling organic shapes, high-contrast complementary palette, screenprint texture, no text. Apply this style uniformly to the entire image and any inserted subject."
   },
   "8bit": {
     "name": "8-bit",
     "emoji": "🎮",
-    "prompt": "Transform this image into a minimalist 8-bit brightly colored cute pixel art scene on a 80x80 pixel grid."
+    "prompt": "8-bit pixel art: render on an ~80×80 pixel grid, bright NES-like palette, hard edges, no anti-aliasing, 1–2 px outlines, simple dithering for gradients, minimal shading. Apply this style uniformly to the entire image and any inserted subject."
   },
   "beard": {
     "name": "Big Beard",
     "emoji": "🧔🏻",
-    "prompt": "Make the person in the photo look like they have a huge beard."
+    "prompt": "Add an oversized, realistic beard to the main subject while preserving the original photographic style (color grade, lighting, noise, sharpness). Ensure any inserted subject matches the same look. Avoid altering the scene beyond the beard addition."
   },
   "comic": {
     "name": "Comic Book",
     "emoji": "💥",
-    "prompt": "Transform the photo into a comic book panel with bold outlines, halftone dots, and speech bubbles."
+    "prompt": "Vintage comic panel: bold black inks, halftone dots at 45°, limited CMYK palette, slight off-register charm, paper texture; speech bubbles allowed. Apply this style uniformly to the entire image and any inserted subject."
   },
   "old": {
     "name": "Old",
     "emoji": "👵🏻",
-    "prompt": "Make the person in the photo look extremely old."
+    "prompt": "Dramatically age the primary person: realistic wrinkles, skin sag, hair graying/thinning, age spots, posture changes; maintain the original photographic style (lighting, grade, grain, sharpness). Ensure any inserted subject matches the same style."
   }
 }
 
@@ -171,52 +171,57 @@ def generate():
         base_prompt = prompt or modes.get(mode, {}).get('prompt', '')
         if b64_random:
             auto_instr = (
-                '''You are an image editor.
+                '''You are an image editor and compositor.
 
 INPUTS
 - Image A: the user’s original scene to edit.
 - Image B: a photobomber subject to extract and insert into Image A.
 
-GOAL
-Insert the subject from Image B into Image A as a subtle, sneaky photobomb that feels native to the scene. The subject should be present but not immediately noticeable.
+OBJECTIVE
+Insert the subject from Image B into Image A as a subtle, sneaky photobomb that is fully consistent with the overall visual style of the final image.
 
-PLACEMENT (choose one or let the model pick the best)
+GLOBAL STYLE UNIFICATION
+- Treat the user/mode prompt text as the authoritative style specification for the whole output.
+- If Image A already exhibits a stylization (e.g., anime/cartoon/renaissance/comic/8-bit), analyze and adopt that exact style.
+- Apply the same style pipeline to the inserted subject: medium/material (oil paint, pencil, halftone, marble, pixel grid), line weight/edge handling, palette and tonal range, texture/noise pattern, shading model, and global color grade/LUT.
+- Ensure the photobomber never reads as a separate layer: identical rendering technique, resolution/sharpness, and post-processing as Image A.
+
+SNEAKY PHOTOBOMBING
 - Placement mode: [edge-of-frame | mid-background crowd | behind foreground object | reflection in glass/mirror].
-- Sneakiness level: [high] → subject partially occluded, off-center, not drawing focus; avoid direct eye contact with camera.
+- Sneakiness level: high → subject is off-center, partially occluded, and not drawing immediate focus; avoid direct eye contact with the camera.
+- Keep outside the 3x3 grid center; prefer edges, background lanes, or reflective surfaces.
+- Scale and pose to match local context (heights, seating/standing level, furniture scale).
 
 COMPOSITION & OCCLUSION
-- Do not cover important faces or focal objects in Image A. Use a face/saliency pass to protect them.
-- Prefer partial occlusion by existing scene elements (doorframe, shoulder, plant, railing) to sell depth.
-- Keep the subject outside the 3x3 grid center; favor edges or background lanes.
-- Scale to match real-world context (heights, distances, furniture scale).
+- Do not cover important faces or primary subjects in Image A (use a saliency/face-protection pass).
+- Use plausible occluders from Image A (doorframe, shoulder, plant, railing) to sell depth and integration.
 
 PERSPECTIVE & GEOMETRY
-- Match camera height, horizon line, and vanishing directions from Image A.
-- Conform to lens characteristics: apply similar distortion/field of view so verticals and proportions align.
+- Match camera height, horizon line, vanishing directions, and lens characteristics (distortion/FOV) from Image A.
 
 LIGHTING & COLOR
-- Match light direction, intensity, and color temperature from Image A.
-- Add physically plausible contact shadow(s) and soft ambient occlusion where the subject meets the environment.
-- Blend speculars/highlights consistent with materials in Image A.
-- Apply Image A’s global grade: white balance, contrast, saturation, and any LUT-like look.
+- Match light direction, intensity, and color temperature.
+- Add physically plausible contact shadows and soft ambient occlusion at contact points.
+- Reproduce specular highlights/roughness consistent with surrounding materials.
+- Conform to Image A’s global grade: white balance, contrast, saturation, and any LUT-like look.
 
 FOCUS, MOTION & NOISE
-- Match depth of field: if the insertion plane is out of focus, blur the subject to the same bokeh/PSF.
-- Add motion blur if Image A shows motion at that location.
-- Match sensor noise/grain, sharpening level, and compression artifacts to Image A.
+- Match depth of field: blur the subject appropriately if its plane is out of focus.
+- Add motion blur when consistent with local motion in Image A.
+- Match sensor noise/grain, sharpening, compression artifacts, and any halftone/pixel structure for the chosen style.
 
 EDGE TREATMENT & MATTE
-- Perform hair-aware matting; remove halos/fringing.
-- Feather and frequency-match edges so there’s no cutout look.
+- Perform hair-aware matting; remove halos and fringing.
+- Feather edges and frequency-match to avoid a cutout look.
 
 REFLECTIONS & INTERACTIONS (if applicable)
-- If near reflective/glossy surfaces, add appropriate reflection/ghosting with correct intensity and blur.
-- If feet or contact points are visible, ensure correct shadow length and softness based on the scene’s key light.
+- If near reflective/glossy surfaces, add a correctly blurred/dimmed reflection with accurate perspective.
+- Ensure correct shadow length and softness based on Image A’s key/fill lighting.
 
 PROTECTIONS & AVOID
-- Do not resize or crop Image A. Preserve all original people and background.
-- Avoid placing the subject in the geometric/tonal center or overlapping primary faces.
-- Avoid mismatched sharpness, color cast, or HDR look that makes the insert pop unnaturally.
+- Do not resize or crop Image A; preserve all original people and background.
+- Avoid center placement and overlapping primary faces.
+- Avoid mismatched sharpness, color cast, HDR pop, or inconsistent line/texture that breaks style cohesion.
 
 OUTPUT
 Return only the edited version of Image A at its original resolution. No captions, borders, or extra canvas.'''
