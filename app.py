@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from PIL import Image
 import uuid
+import random
 
 load_dotenv()
 
@@ -23,6 +24,28 @@ client = OpenAI(
 
 # In-memory store for images
 image_store = {}
+
+
+def get_random_photobomber_b64():
+    """Return base64-encoded data of a random photobomber image."""
+    photobomber_dir = os.path.join('static', 'photobomber')
+    os.makedirs(photobomber_dir, exist_ok=True)
+    candidates = [
+        f
+        for f in os.listdir(photobomber_dir)
+        if f.lower().endswith(('.jpg', '.jpeg', '.png'))
+    ]
+
+    if not candidates:
+        return None, None
+
+    filename = random.choice(candidates)
+    path = os.path.join(photobomber_dir, filename)
+    with Image.open(path) as img:
+        buf = BytesIO()
+        img.convert('RGB').save(buf, format='JPEG')
+        b64_random = base64.b64encode(buf.getvalue()).decode('utf-8')
+    return b64_random, path
 
 # Predefined modes for the photobooth
 modes = {
@@ -116,10 +139,25 @@ def generate():
 
     generated_data_url = None
     api_error = None
+    photobomber_path = None
+    photobomber_message = None
     try:
         referer = os.environ.get('SITE_URL') or request.headers.get('Referer') or ''
         title = os.environ.get('SITE_TITLE') or 'Gembooth'
         api_model = os.environ.get('IMAGE_MODEL', 'google/gemini-2.5-flash-image-preview:free')
+
+        b64_random, photobomber_path = get_random_photobomber_b64()
+        content = [
+            {"type": "text", "text": prompt or modes.get(mode, {}).get('prompt', '')},
+            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"}},
+        ]
+        if b64_random:
+            content.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:image/jpeg;base64,{b64_random}"},
+            })
+        else:
+            photobomber_message = "Photobomber directory is empty."
 
         completion = client.chat.completions.create(
             extra_headers={
@@ -130,10 +168,7 @@ def generate():
             messages=[
                 {
                     "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt or modes.get(mode, {}).get('prompt', '')},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"}},
-                    ],
+                    "content": content,
                 }
             ],
             modalities=["image", "text"],
@@ -197,6 +232,8 @@ def generate():
         'output': output_path,
         'mode': mode,
     }
+    if photobomber_path:
+        image_store[image_id]['photobomber'] = photobomber_path
 
     return jsonify({
         'id': image_id,
@@ -205,6 +242,7 @@ def generate():
         'mode': mode,
         'emoji': modes.get(mode, {}).get('emoji', '✨'),
         'api_error': api_error,
+        'photobomber_message': photobomber_message,
     })
 
 @app.route('/make_gif', methods=['POST'])
