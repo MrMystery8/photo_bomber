@@ -182,6 +182,7 @@ img {
   word-wrap: normal;
   direction: ltr;
   -webkit-font-feature-settings: 'liga';
+  font-feature-settings: 'liga';
   -webkit-font-smoothing: antialiased;
   font-variation-settings:
     'FILL' 0,
@@ -398,6 +399,7 @@ img {
   border-radius: var(--radius-sm);
   background: var(--color-bg-tertiary);
   outline: none;
+  appearance: none;
   -webkit-appearance: none;
 }
 

@@ -33,7 +33,11 @@ logs/
 *.crt
 
 # Generated user images and uploads (personal data)
-static/generated_images/
+# Keep folders but ignore all files
+static/generated_images/*
+!static/generated_images/.gitkeep
+static/photobomber/*
+!static/photobomber/.gitkeep
 uploads/
 data/
 tmp/
