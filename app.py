@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from PIL import Image
 import uuid
+import random
 
 load_dotenv()
 
@@ -23,6 +24,38 @@ client = OpenAI(
 
 # In-memory store for images
 image_store = {}
+
+
+def get_random_photobomber_b64(output_mime: str = 'image/jpeg'):
+    """Return base64-encoded data of a random photobomber image, encoded
+    to match the requested MIME (e.g., 'image/jpeg' or 'image/png')."""
+    photobomber_dir = os.path.join('static', 'photobomber')
+    os.makedirs(photobomber_dir, exist_ok=True)
+    candidates = [
+        f
+        for f in os.listdir(photobomber_dir)
+        if f.lower().endswith(('.jpg', '.jpeg', '.png'))
+    ]
+
+    if not candidates:
+        return None, None
+
+    filename = random.choice(candidates)
+    path = os.path.join(photobomber_dir, filename)
+    # Choose PIL save format from MIME
+    fmt = 'JPEG'
+    if isinstance(output_mime, str) and output_mime.lower() == 'image/png':
+        fmt = 'PNG'
+
+    with Image.open(path) as img:
+        buf = BytesIO()
+        if fmt == 'JPEG':
+            img.convert('RGB').save(buf, format=fmt)
+        else:
+            # Preserve alpha for PNG output
+            img.convert('RGBA').save(buf, format=fmt)
+        b64_random = base64.b64encode(buf.getvalue()).decode('utf-8')
+    return b64_random, path
 
 # Predefined modes for the photobooth
 modes = {
@@ -95,10 +128,19 @@ def generate():
 
     try:
         image_data_url = data['image']
-        if image_data_url.startswith('data:image') and ',' in image_data_url:
+        # Detect MIME type from the incoming data URL so we can mirror it
+        input_mime = 'image/jpeg'
+        if isinstance(image_data_url, str) and image_data_url.startswith('data:image') and ';base64,' in image_data_url:
+            try:
+                header = image_data_url.split(',')[0]  # e.g., 'data:image/jpeg;base64'
+                input_mime = header.split(':', 1)[1].split(';', 1)[0]  # 'image/jpeg'
+            except Exception:
+                input_mime = 'image/jpeg'
             b64_image = image_data_url.split(',')[1]
         else:
+            # If the client sent raw base64, assume JPEG by default
             b64_image = image_data_url
+            input_mime = 'image/jpeg'
 
         prompt = data.get('prompt', '')
         mode = data.get('mode', 'custom')
@@ -116,10 +158,46 @@ def generate():
 
     generated_data_url = None
     api_error = None
+    photobomber_path = None
+    photobomber_message = None
     try:
         referer = os.environ.get('SITE_URL') or request.headers.get('Referer') or ''
         title = os.environ.get('SITE_TITLE') or 'Gembooth'
         api_model = os.environ.get('IMAGE_MODEL', 'google/gemini-2.5-flash-image-preview:free')
+
+        b64_random, photobomber_path = get_random_photobomber_b64(input_mime)
+
+        # Build prompt, auto-instructing the model to perform a photobomb when present
+        base_prompt = prompt or modes.get(mode, {}).get('prompt', '')
+        if b64_random:
+            auto_instr = (
+                "Additionally, you are given two images. The first is the user's scene to edit. "
+                "The second is a photobomber. Insert the subject from the second image into the first "
+                "as a natural photobomb. Preserve the first image's setting, people, and background. "
+                "Match lighting and perspective, scale appropriately, avoid covering important faces, "
+                "and blend edges for a seamless result. Return only the edited image."
+            )
+            full_prompt = (base_prompt + "\n\n" + auto_instr).strip()
+        else:
+            photobomber_message = "Photobomber directory is empty."
+            full_prompt = base_prompt
+
+        # Send the exact user data URL for the first image when possible, to preserve format
+        user_image_url = (
+            image_data_url if (isinstance(image_data_url, str) and image_data_url.startswith('data:image'))
+            else f"data:{input_mime};base64,{b64_image}"
+        )
+
+        # Photobomber encoded to the same MIME as the user's image
+        content = [
+            {"type": "text", "text": full_prompt},
+            {"type": "image_url", "image_url": {"url": user_image_url}},
+        ]
+        if b64_random:
+            content.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:{input_mime};base64,{b64_random}"},
+            })
 
         completion = client.chat.completions.create(
             extra_headers={
@@ -130,10 +208,7 @@ def generate():
             messages=[
                 {
                     "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt or modes.get(mode, {}).get('prompt', '')},
-                        {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64_image}"}},
-                    ],
+                    "content": content,
                 }
             ],
             modalities=["image", "text"],
@@ -197,6 +272,8 @@ def generate():
         'output': output_path,
         'mode': mode,
     }
+    if photobomber_path:
+        image_store[image_id]['photobomber'] = photobomber_path
 
     return jsonify({
         'id': image_id,
@@ -205,6 +282,7 @@ def generate():
         'mode': mode,
         'emoji': modes.get(mode, {}).get('emoji', '✨'),
         'api_error': api_error,
+        'photobomber_message': photobomber_message,
     })
 
 @app.route('/make_gif', methods=['POST'])
