@@ -116,6 +116,9 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  transition: background-color var(--duration-medium) var(--easing-standard),
+              color var(--duration-medium) var(--easing-standard),
+              border-color var(--duration-medium) var(--easing-standard);
 }
 
 html {
