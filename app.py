@@ -171,11 +171,55 @@ def generate():
         base_prompt = prompt or modes.get(mode, {}).get('prompt', '')
         if b64_random:
             auto_instr = (
-                "Additionally, you are given two images. The first is the user's scene to edit. "
-                "The second is a photobomber. Insert the subject from the second image into the first "
-                "as a natural photobomb. Preserve the first image's setting, people, and background. "
-                "Match lighting and perspective, scale appropriately, avoid covering important faces, "
-                "and blend edges for a seamless result. Return only the edited image."
+                '''You are an image editor.
+
+INPUTS
+- Image A: the user’s original scene to edit.
+- Image B: a photobomber subject to extract and insert into Image A.
+
+GOAL
+Insert the subject from Image B into Image A as a subtle, sneaky photobomb that feels native to the scene. The subject should be present but not immediately noticeable.
+
+PLACEMENT (choose one or let the model pick the best)
+- Placement mode: [edge-of-frame | mid-background crowd | behind foreground object | reflection in glass/mirror].
+- Sneakiness level: [high] → subject partially occluded, off-center, not drawing focus; avoid direct eye contact with camera.
+
+COMPOSITION & OCCLUSION
+- Do not cover important faces or focal objects in Image A. Use a face/saliency pass to protect them.
+- Prefer partial occlusion by existing scene elements (doorframe, shoulder, plant, railing) to sell depth.
+- Keep the subject outside the 3x3 grid center; favor edges or background lanes.
+- Scale to match real-world context (heights, distances, furniture scale).
+
+PERSPECTIVE & GEOMETRY
+- Match camera height, horizon line, and vanishing directions from Image A.
+- Conform to lens characteristics: apply similar distortion/field of view so verticals and proportions align.
+
+LIGHTING & COLOR
+- Match light direction, intensity, and color temperature from Image A.
+- Add physically plausible contact shadow(s) and soft ambient occlusion where the subject meets the environment.
+- Blend speculars/highlights consistent with materials in Image A.
+- Apply Image A’s global grade: white balance, contrast, saturation, and any LUT-like look.
+
+FOCUS, MOTION & NOISE
+- Match depth of field: if the insertion plane is out of focus, blur the subject to the same bokeh/PSF.
+- Add motion blur if Image A shows motion at that location.
+- Match sensor noise/grain, sharpening level, and compression artifacts to Image A.
+
+EDGE TREATMENT & MATTE
+- Perform hair-aware matting; remove halos/fringing.
+- Feather and frequency-match edges so there’s no cutout look.
+
+REFLECTIONS & INTERACTIONS (if applicable)
+- If near reflective/glossy surfaces, add appropriate reflection/ghosting with correct intensity and blur.
+- If feet or contact points are visible, ensure correct shadow length and softness based on the scene’s key light.
+
+PROTECTIONS & AVOID
+- Do not resize or crop Image A. Preserve all original people and background.
+- Avoid placing the subject in the geometric/tonal center or overlapping primary faces.
+- Avoid mismatched sharpness, color cast, or HDR look that makes the insert pop unnaturally.
+
+OUTPUT
+Return only the edited version of Image A at its original resolution. No captions, borders, or extra canvas.'''
             )
             full_prompt = (base_prompt + "\n\n" + auto_instr).strip()
         else:
